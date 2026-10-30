@@ -1,0 +1,131 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with display name, bio, level, and XP.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID"
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address"
+        },
+        "username": {
+          "type": "string",
+          "description": "Display username"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name"
+        },
+        "bio": {
+          "type": "string",
+          "description": "User bio or motto"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Avatar image URL"
+        },
+        "level": {
+          "type": "number",
+          "description": "Defender Level"
+        },
+        "xp": {
+          "type": "number",
+          "description": "Total XP points"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Account creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["userId", "email", "displayName"]
+    },
+    "UserNote": {
+      "title": "UserNote",
+      "description": "Apologetics study note saved by the user.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Note unique ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner user ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Note title",
+          "maxLength": 200
+        },
+        "content": {
+          "type": "string",
+          "description": "Note content",
+          "maxLength": 10000
+        },
+        "category": {
+          "type": "string",
+          "description": "Category name",
+          "maxLength": 100
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Date string"
+        }
+      },
+      "required": ["id", "userId", "title", "content"]
+    },
+    "UserSavedTopic": {
+      "title": "UserSavedTopic",
+      "description": "Custom or generated topic saved by the user.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Topic unique ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner user ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Topic title",
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "description": "Topic category",
+          "maxLength": 100
+        },
+        "savedAt": {
+          "type": "string",
+          "description": "Save date string"
+        }
+      },
+      "required": ["id", "userId", "title"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores user profile information, level, and XP."
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": "UserNote",
+      "description": "User notes subcollection."
+    },
+    "/users/{userId}/savedTopics/{topicId}": {
+      "schema": "UserSavedTopic",
+      "description": "User saved topics subcollection."
+    }
+  }
+}

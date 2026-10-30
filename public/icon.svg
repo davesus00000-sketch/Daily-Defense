@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="50%" stop-color="#eab308" />
+      <stop offset="100%" stop-color="#ca8a04" />
+    </linearGradient>
+    <filter id="goldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle -->
+  <rect width="512" height="512" rx="110" fill="url(#bgGrad)" />
+  <rect x="16" y="16" width="480" height="480" rx="98" fill="none" stroke="#c9a84c" stroke-width="4" stroke-opacity="0.35" />
+
+  <!-- Shield of Faith background silhouette -->
+  <path d="M256 70 C330 70 380 95 380 95 C380 230 340 360 256 425 C172 360 132 230 132 95 C132 95 182 70 256 70 Z" 
+        fill="#1e3a8a" stroke="#c9a84c" stroke-width="3" stroke-opacity="0.5" />
+
+  <!-- Radiant Latin Cross -->
+  <g filter="url(#goldGlow)">
+    <!-- Vertical beam -->
+    <rect x="230" y="110" width="52" height="280" rx="6" fill="url(#goldGrad)" />
+    <!-- Horizontal crossbar -->
+    <rect x="156" y="180" width="200" height="52" rx="6" fill="url(#goldGrad)" />
+    <!-- Center flared diamond jewel -->
+    <polygon points="256,165 295,206 256,247 217,206" fill="#fef08a" opacity="0.9" />
+  </g>
+</svg>

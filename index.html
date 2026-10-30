@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Daily Defense - Catholic Apologetics</title>
+    <meta name="description" content="Comprehensive Catholic apologetics web application featuring in-depth topic studies, AI practice debates, Scripture lookup, traditional prayers, and XP progress tracking." />
+    <meta property="og:title" content="Daily Defense - Catholic Apologetics" />
+    <meta property="og:description" content="Comprehensive Catholic apologetics web application featuring in-depth topic studies, AI practice debates, Scripture lookup, traditional prayers, and XP progress tracking." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- PWA & Mobile Web Standards -->
+    <meta name="theme-color" content="#1e3a8a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="DailyDefense" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // Gracefully prevent unhandled WebSocket closure notices from halting app execution
+      window.addEventListener('error', function(e) {
+        if (e.message && (e.message.includes('WebSocket') || e.message.includes('ws') || e.message.includes('opened'))) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+          return true;
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function(e) {
+        var msg = String(e.reason && (e.reason.message || e.reason) || '');
+        if (msg.includes('WebSocket') || msg.includes('opened')) {
+          e.preventDefault();
+        }
+      });
+      // Filter out [vite] WebSocket closed logs from console.error
+      var _origErr = console.error;
+      console.error = function() {
+        var joined = Array.prototype.slice.call(arguments).map(function(a) {
+          return String(a && a.message ? a.message : a);
+        }).join(' ');
+        if (joined.includes('WebSocket') || joined.includes('server connection lost')) {
+          return;
+        }
+        _origErr.apply(console, arguments);
+      };
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
