@@ -50,10 +50,14 @@ let aiInstance: GoogleGenAI | null = null;
 
 function getAiClient(): GoogleGenAI | null {
   if (aiInstance) return aiInstance;
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (apiKey) {
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY;
+
+  if (apiKey && apiKey.trim() && apiKey !== "MY_GEMINI_API_KEY") {
     aiInstance = new GoogleGenAI({
-      apiKey,
+      apiKey: apiKey.trim(),
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
@@ -71,6 +75,49 @@ function isAiAvailable(): boolean {
     return false;
   }
   return true;
+}
+
+// Resilient Gemini generator: tries Search Grounding first, then direct generation, across compatible models
+async function callGemini(
+  client: GoogleGenAI,
+  contents: any,
+  systemInstruction?: string,
+  useSearch = true
+) {
+  const models = ["gemini-3.8-flash", "gemini-2.5-flash"];
+
+  for (const model of models) {
+    if (useSearch) {
+      try {
+        const response = await client.models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction,
+            tools: [{ googleSearch: {} }],
+          },
+        });
+        if (response?.text) return response;
+      } catch (err) {
+        console.warn(`Search grounding on ${model} not available, retrying without tools...`);
+      }
+    }
+
+    try {
+      const response = await client.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction,
+        },
+      });
+      if (response?.text) return response;
+    } catch (err) {
+      console.warn(`Generation on ${model} failed:`, (err as any)?.message || err);
+    }
+  }
+
+  return null;
 }
 
 // Curated authentic baseline quotes for Catholic Pillars & Science Fathers
@@ -378,22 +425,14 @@ apiRouter.post("/chat", async (req, res) => {
           contents.unshift({ role: "user", parts: [{ text: "Hello" }] });
         }
 
-        const response = await client.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents,
-          config: {
-            systemInstruction:
-              (systemPrompt ||
-                "You are an expert, faithful, and charitable Catholic apologist and theologian, thoroughly grounded in Sacred Scripture, Sacred Tradition, and the Catechism of the Catholic Church.") +
-              "\nAlways use Google Search to verify Catholic doctrine, Catechism citations, Scripture references, Church councils, historical facts, and Patristic quotes for 100% accurate, reliable answers.",
-            tools: [{ googleSearch: {} }],
-            thinkingConfig: isDeepThink
-              ? { thinkingLevel: ThinkingLevel.HIGH }
-              : undefined,
-          },
-        });
+        const sysPrompt =
+          (systemPrompt ||
+            "You are an expert, faithful, and charitable Catholic apologist and theologian, thoroughly grounded in Sacred Scripture, Sacred Tradition, and the Catechism of the Catholic Church.") +
+          "\nAlways cite Catholic doctrine, Catechism citations (CCC), Scripture references, Church councils, historical facts, and Patristic quotes for 100% accurate, reliable answers.";
 
-        if (response.text) {
+        const response = await callGemini(client, contents, sysPrompt, true);
+
+        if (response && response.text) {
           const { sources, searchQueries } = extractGrounding(response);
           return res.json({
             reply: response.text,
@@ -498,9 +537,7 @@ apiRouter.post("/ai/generate-topic", async (req, res) => {
 
   if (isAiAvailable() && client && objection) {
     try {
-      const response = await client.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: `Use Google Search to research the authentic Catholic apologetic defense for: "${objection}".
+      const prompt = `Use Google Search to research the authentic Catholic apologetic defense for: "${objection}".
 Search for real Bible passages, early Church Fathers quotes with specific work titles and dates, and philosophical arguments.
 Return your response strictly formatted as valid JSON with no extraneous text. The JSON object MUST have these exact keys:
 {
@@ -517,15 +554,13 @@ Return your response strictly formatted as valid JSON with no extraneous text. T
   ],
   "practicalTips": ["Tip 1", "Tip 2", "Tip 3"],
   "commonMistakes": ["Pitfall 1", "Pitfall 2"]
-}`,
-        config: {
-          systemInstruction:
-            "You are an expert Catholic theologian and apologist. Use Google Search to verify all scripture citations, historical Church Father quotes, and Catechism references for accuracy.",
-          tools: [{ googleSearch: {} }],
-        },
-      });
+}`;
+      const sysInstruction =
+        "You are an expert Catholic theologian and apologist. Use Google Search to verify all scripture citations, historical Church Father quotes, and Catechism references for accuracy. Return valid JSON only.";
 
-      if (response.text) {
+      const response = await callGemini(client, prompt, sysInstruction, true);
+
+      if (response && response.text) {
         let cleaned = response.text.trim();
         if (cleaned.startsWith("```")) {
           cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
@@ -606,11 +641,8 @@ apiRouter.post("/ai/review-session", async (req, res) => {
 
   if (isAiAvailable() && client && transcript) {
     try {
-      const response = await client.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: `Please review this apologetics debate transcript between a Catholic student and a ${opponentType || "Challenger"} (${difficulty || "Intermediate"} difficulty):\n\n${transcript}`,
-        config: {
-          systemInstruction: `You are an expert Catholic apologetics coach (like Trent Horn or Jimmy Akin). Evaluate the user's debate performance. Use Google Search to verify theological facts or debate points raised.
+      const prompt = `Please review this apologetics debate transcript between a Catholic student and a ${opponentType || "Challenger"} (${difficulty || "Intermediate"} difficulty):\n\n${transcript}`;
+      const sysInstruction = `You are an expert Catholic apologetics coach (like Trent Horn or Jimmy Akin). Evaluate the user's debate performance.
 Format your review with clear markdown sections:
 ### 🛡️ Apologetics Coach Session Review
 **Opponent:** [Opponent] ([Difficulty])
@@ -625,12 +657,11 @@ Format your review with clear markdown sections:
 **Recommended Study Topics:**
 - [Topic 1]
 - [Topic 2]
-**Score:** [e.g. 8.8 / 10] - [Encouraging conclusion]`,
-          tools: [{ googleSearch: {} }],
-        },
-      });
+**Score:** [e.g. 8.8 / 10] - [Encouraging conclusion]`;
 
-      if (response.text) {
+      const response = await callGemini(client, prompt, sysInstruction, true);
+
+      if (response && response.text) {
         const { sources } = extractGrounding(response);
         return res.json({ review: response.text, groundingSources: sources });
       }
@@ -651,17 +682,13 @@ apiRouter.post("/ai/pray", async (req, res) => {
 
   if (isAiAvailable() && client && situation) {
     try {
-      const response = await client.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: `Please compose a devout, heartfelt Catholic prayer for this intention or situation: "${situation}". Search for suitable Psalms or Saint quotes if helpful.`,
-        config: {
-          systemInstruction:
-            "You are a devout Catholic spiritual director and priest. Compose a beautiful, authentic Catholic prayer (6-10 sentences). Address the Holy Trinity or Jesus Christ, invoke the maternal intercession of the Blessed Virgin Mary and suitable patron Saints, cite or weave in a short verse from the Psalms, and conclude traditionally with 'Through Christ our Lord, in the unity of the Holy Spirit, God forever and ever. Amen.'",
-          tools: [{ googleSearch: {} }],
-        },
-      });
+      const prompt = `Please compose a devout, heartfelt Catholic prayer for this intention or situation: "${situation}". Search for suitable Psalms or Saint quotes if helpful.`;
+      const sysInstruction =
+        "You are a devout Catholic spiritual director and priest. Compose a beautiful, authentic Catholic prayer (6-10 sentences). Address the Holy Trinity or Jesus Christ, invoke the maternal intercession of the Blessed Virgin Mary and suitable patron Saints, cite or weave in a short verse from the Psalms, and conclude traditionally with 'Through Christ our Lord, in the unity of the Holy Spirit, God forever and ever. Amen.'";
 
-      if (response.text) {
+      const response = await callGemini(client, prompt, sysInstruction, true);
+
+      if (response && response.text) {
         return res.json({ prayer: response.text });
       }
     } catch (err) {
@@ -681,19 +708,15 @@ apiRouter.post("/ai/explain-verse", async (req, res) => {
 
   if (isAiAvailable() && client && reference) {
     try {
-      const response = await client.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: `Use Google Search to find orthodox Catholic commentaries for ${reference}: "${text || ""}".
+      const prompt = `Use Google Search to find orthodox Catholic commentaries for ${reference}: "${text || ""}".
 Reference Church Fathers (such as Augustine, Chrysostom, or Irenaeus), St. Thomas Aquinas (Catena Aurea), or Magisterial councils (Trent, Vatican II).
-Explain how Catholic theology understands this passage, addressing common misunderstandings with charitable rigor.`,
-        config: {
-          systemInstruction:
-            "You are a Catholic biblical scholar and apologist. Use Google Search to verify all theological citations and historical contexts so answers are 100% faithful and accurate. Provide 3-5 sentences of insightful commentary.",
-          tools: [{ googleSearch: {} }],
-        },
-      });
+Explain how Catholic theology understands this passage, addressing common misunderstandings with charitable rigor.`;
+      const sysInstruction =
+        "You are a Catholic biblical scholar and apologist. Use Google Search to verify all theological citations and historical contexts so answers are 100% faithful and accurate. Provide 3-5 sentences of insightful commentary.";
 
-      if (response.text) {
+      const response = await callGemini(client, prompt, sysInstruction, true);
+
+      if (response && response.text) {
         const { sources, searchQueries } = extractGrounding(response);
         return res.json({
           explanation: response.text,
@@ -864,4 +887,12 @@ apiRouter.get("/health", (_req, res) => {
 app.use("/api", apiRouter);
 app.use("/", apiRouter);
 
-export default app;
+// Export app for local express server.ts
+export { app };
+
+// Default export as serverless handler for Vercel
+export default function handler(req: any, res: any) {
+  return app(req, res);
+}
+
+

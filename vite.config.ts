@@ -58,6 +58,9 @@ export default defineConfig(() => {
         '@': path.resolve(import.meta.dirname || '.', '.'),
       },
     },
+    build: {
+      chunkSizeWarningLimit: 2500,
+    },
     server: {
       // HMR is disabled in AI Studio preview to prevent WebSocket closed errors
       hmr: false,
